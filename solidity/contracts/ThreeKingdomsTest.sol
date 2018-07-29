@@ -1,6 +1,6 @@
 pragma solidity ^0.4.24;
 
-contract ThreeKingdoms {
+contract ThreeKingdomsTest {
 
     uint constant kingdomNum = 3;  // number of kingdoms
 
@@ -18,10 +18,12 @@ contract ThreeKingdoms {
     // max block number since last deposit, approximate 144*200/3600=8 hours
     uint constant maxBlockNum = 200;
     // min vote value, 0.1 QTUM
-    uint constant minVoteValue = 0.1 * 1e9;
+    uint constant qtumToken = 1e8;
+    uint constant minVoteValue = qtumToken / 10;
+    // percentage decimal
+    uint constant ratioDecimal = 10000;
     // percentage of value reward voters
-    uint constant ratio = 85;
-    uint constant ratioDecimal = 100;
+    uint constant ratio = 8500;
 
     /**
     * init owner, data and endBlockNum
@@ -35,13 +37,21 @@ contract ThreeKingdoms {
 
         endBlockNum = block.number + maxBlockNum;
     }
+    function getOwner() external view returns(address) {
+        return owner;
+    }
 
     /**
-    * return price per vote
+    * return price per vote in ratioDecimal,
+    * that is, the return value / ratioDecimal is the actual price
+    * init with 0.01 
+    * and when value rise to 1000 the price rise to 1.01
+    * should subtract the value send this time when get value
     */
-    function getVotePrice() public view returns(uint) {
-        uint token = address(this).balance / 1e9;
-        return 0.01 * 1e9 + token / 1000;
+    function getVotePrice(uint currentSend) public view returns(uint) {
+        uint value = address(this).balance - currentSend;  // sub the value send currently
+        uint token = value / qtumToken;
+        return ratioDecimal / 100 + ratioDecimal * token / 1000;
     }
     /**
     * vote token for your kingdom
@@ -57,12 +67,12 @@ contract ThreeKingdoms {
         require(!isGameOver(), "game is over");
 
         // append address to votes if hasn't voted before
-        if (data[kingdomIndex].votes[msg.sender] != 0) {
+        if (data[kingdomIndex].votes[msg.sender] == 0) {
             data[kingdomIndex].voters.push(msg.sender);
         }
 
         // transfer value to votes
-        uint votes = msg.value / getVotePrice();
+        uint votes = (msg.value * ratioDecimal) / getVotePrice(msg.value);
         data[kingdomIndex].votes[msg.sender] += votes;
         data[kingdomIndex].balance += votes;
 
@@ -78,21 +88,27 @@ contract ThreeKingdoms {
     * and there is no deuce, the game is over.
     * only when res == true, other return params take effect
     */
+    function getBlockLeft() public view returns(uint){
+        return endBlockNum - block.number;
+    }
     function isGameOver() public view returns(bool res) {  // only return a bool
+        uint blockLeft;
         uint8 resType;
         uint8[kingdomNum] memory indexSort; 
         uint[kingdomNum] memory balanceSort;
-        (res, resType, indexSort, balanceSort) = checkGameOver();
+        (res, blockLeft, resType, indexSort, balanceSort) = checkGameOver();
         return;
     }
     function checkGameOver() public view returns(  // return bool and other status params
             bool res,
+            uint blockLeft,
             uint8 resType, 
             uint8[kingdomNum] indexSort, 
             uint[kingdomNum] balanceSort) {
+        blockLeft = getBlockLeft();
 
         // cost a lot of gas when finalize and deuce
-        if (block.number > endBlockNum) {
+        if (blockLeft < 0) {
             (resType, indexSort, balanceSort) = gameResult();
 
             if (resType == 2 || resType == 3) {
@@ -181,10 +197,12 @@ contract ThreeKingdoms {
     function finalize() external {
         require(owner == msg.sender, "only owner can finalize the game");
 
-        (bool res,
-        uint8 resType, 
-        uint8[kingdomNum] memory indexSort,
-        uint[kingdomNum] memory balanceSort) = checkGameOver();
+        bool res;
+        uint blockLeft;
+        uint8 resType;
+        uint8[kingdomNum] memory indexSort;
+        uint[kingdomNum] memory balanceSort;
+        (res, blockLeft, resType, indexSort, balanceSort) = checkGameOver();
 
         require(res, "the game is not over");  // game should be over
 
@@ -251,10 +269,6 @@ contract ThreeKingdoms {
 
     function getValue() public view returns(uint) {
         return address(this).balance;
-    }
-
-    function getEndBlockNum() public view returns(uint){
-        return endBlockNum;
     }
 
     function getVoters(uint8 kingdomIndex) public view returns(address[]){

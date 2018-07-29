@@ -104,79 +104,80 @@ contract theThreeKingdoms {
         withdraw();
     }
 
-    /*
+        /*
         @description: distribute rewards to people who win the game
     */
-    function reward(address voterAddress) private returns (uint[]){
-        uint[] amounts;
-        uint[] rewards;
-        uint[] kingsAmount;
-        uint totalAmount = 0;
+    function reward(address voterAddress) public returns (uint[]){
+        uint[] values;
         uint total = 0;
+        uint balance = 0;
+        
+        
         for (uint i = 0; i < KingdomNum; i++) {
-            amounts.push(data[i].votes[voterAddress]);
-            kingsAmount.push(data[i].balance);
-            totalAmount += amounts[i];
-            total += kingsAmount[i];
+            values.push(data[i].votes[voterAddress]);
+            balance = data[i].balance;
+            total += balance;
         }
 
 
         for (i = 0; i < KingdomNum; i++) {
-            if (amounts[i] != 0) {
-                uint rewardByKing = safeMul(total, amounts[i]);
-                rewards.push(rewardByKing / amounts[i]);
+            if (values[i] != 0) {
+                uint rewardByKing = safeMul(total, values[i]);
+                values[i] = safeMul((rewardByKing / values[i]),ratio) / ratioDecimal;
+            } else {
+                values[i] = 0;
             }
-            else
-                rewards.push(0);
         }
 
-        return rewards;
+        return values;
     }
 
     /*
         @description: withdraw left token to reward the developer
     */
     function withdraw() private onlyOwner {
-    assert(block.number >= endtime);
+        assert(block.number >= endtime);
+        assert(!deuceEqualityAsIndividual());
+        uint8 direction;
+        uint max;
+        uint maxIndex;
+        uint total;
+        (direction, max, maxIndex, total) = deuceEqualityAsAlliance();
+        if (direction == 0) {
+            return;
+        }
 
-    uint[] kingsAmount;
+        uint i;
 
-    uint totalAmount = 0;
-    uint total = 0;
+        uint reward = safeMul(total, ratio);
 
-    kingsAmount[i] = data[i].balance;
-    total += kingsAmount[i];
 
-    uint maxIndex = 0;
-    uint max = 0;
-    for (uint i = 0; i < data.length; i += 1) {
-        kingsAmount[i] = data[i].balance;
-        total += kingsAmount[i];
-        if (i > 0) {
-            if (max < kingsAmount[i]) {
-                max = kingsAmount[i];
-                maxIndex = i;
+        if (direction == 1) {
+            reward = safeMul(reward / max , ratio) / ratioDecimal;
+            address[] vs = data[maxIndex].voters;
+            for (uint j = 0; j < vs.length; j++) {
+                address voter = vs[j];
+                uint amount = data[maxIndex].votes[voter];
+                uint rewardByVoter = safeMul(amount, reward);
+                voter.send(rewardByVoter);
             }
         } else {
-            max = kingsAmount[i];
+            reward = safeMul(reward / (safeSub(total , max)) , ratio) / ratioDecimal;
+            for (i = 0; i < KingdomNum; i++) {
+                if (i != maxIndex) {
+                    vs = data[i].voters;
+
+                    for(j = 0; j < vs.length; j ++) {
+                        voter = vs[j];
+                        amount = data[i].votes[voter];
+                        rewardByVoter = safeMul(amount, reward);
+                        voter.send(rewardByVoter);
+                    }
+                }
+            }
         }
+
     }
-
-    uint
-    reward = safeMul(total - kingsAmount[maxIndex], ratio);
-    reward = reward / ratioDecimal / decimal;
-    reward = reward / kingsAmount[maxIndex];
-    address[] voterList = data[maxIndex].voters;
-
-    for ( i = 0; i < voterList.length; i += 1) {
-        address voter = voterList[i];
-        uint amount = data[maxIndex].votes[voter];
-        reward = safeMul(amount, reward) / decimal;
-        voter.send(reward);
-    }
-
-
-}
 
     // 多方势力值相等
     function deuceEquality() private returns (bool) {

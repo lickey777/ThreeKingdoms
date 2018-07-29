@@ -109,7 +109,7 @@ contract ThreeKingdomsTest {
 
         // cost a lot of gas when finalize and deuce
         if (blockLeft < 0) {
-            (resType, indexSort, balanceSort) = gameResult();
+            (resType, indexSort, balanceSort) = getGameResult();
 
             if (resType == 2 || resType == 3) {
                 res = true;
@@ -131,7 +131,7 @@ contract ThreeKingdomsTest {
     * uint[kingdomNum]
     * kingdom index sort by balance, from high to low
     */
-    function gameResult() private view returns(
+    function getGameResult() public view returns(
             uint8 resType, 
             uint8[kingdomNum] indexSort, 
             uint[kingdomNum] balanceSort) {

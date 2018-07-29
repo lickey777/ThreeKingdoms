@@ -2,15 +2,14 @@ pragma solidity ^0.4.24;
 
 contract ThreeKingdoms {
 
-    uint constant kingdomNum = 3;
+    uint constant kingdomNum = 3;  // number of kingdoms
 
     struct KingdomInfo {
         uint balance;  // store balance for each kingdom
         mapping(address => uint) votes;  // store votes for each kingdom
         address[] voters;  // store voters for each kingdom
     }
-
-    KingdomInfo[kingdomNum] data;
+    KingdomInfo[kingdomNum] data;  // main data structure
 
     // the person who can finalize the game
     address owner;
@@ -19,13 +18,13 @@ contract ThreeKingdoms {
     // max block number since last deposit, approximate 144*200/3600=8 hours
     uint constant maxBlockNum = 200;
     // min vote value, 0.1 QTUM
-    uint constant minVoteValue = 100000000;
+    uint constant minVoteValue = 0.1 * 1e9;
     // percentage of value reward voters
-    uint constant ratio = 90;
+    uint constant ratio = 85;
     uint constant ratioDecimal = 100;
 
     /**
-    * init owner, data  and endBlockNum
+    * init owner, data and endBlockNum
     */
     constructor() public {
         owner = msg.sender;
@@ -38,18 +37,36 @@ contract ThreeKingdoms {
     }
 
     /**
+    * return price per vote
+    */
+    function getVotePrice() public view returns(uint) {
+        uint token = address(this).balance / 1e9;
+        return 0.01 * 1e9 + token / 1000;
+    }
+    /**
     * vote token for your kingdom
     */
+    event Vote(
+        address indexed _from,
+        uint8 indexed _index,
+        uint _value
+    );
     function vote(uint8 kingdomIndex) external payable returns(uint) {
         require(kingdomIndex < kingdomNum, "wrong input kingdomIndex");
         require(msg.value >= minVoteValue, "vote value is lower than threshold");
         require(!isGameOver(), "game is over");
 
+        // append address to votes if hasn't voted before
         if (data[kingdomIndex].votes[msg.sender] != 0) {
             data[kingdomIndex].voters.push(msg.sender);
         }
-        data[kingdomIndex].votes[msg.sender] += msg.value;
-        data[kingdomIndex].balance += msg.value;
+
+        // transfer value to votes
+        uint votes = msg.value / getVotePrice();
+        data[kingdomIndex].votes[msg.sender] += votes;
+        data[kingdomIndex].balance += votes;
+
+        emit Vote(msg.sender, kingdomIndex, msg.value);
 
         // update endBlockNum
         endBlockNum = block.number + maxBlockNum;
@@ -61,19 +78,20 @@ contract ThreeKingdoms {
     * and there is no deuce, the game is over.
     * only when res == true, other return params take effect
     */
-    function isGameOver() public view returns(bool res) {
+    function isGameOver() public view returns(bool res) {  // only return a bool
         uint8 resType;
         uint8[kingdomNum] memory indexSort; 
         uint[kingdomNum] memory balanceSort;
         (res, resType, indexSort, balanceSort) = checkGameOver();
         return;
     }
-    function checkGameOver() public view returns(
+    function checkGameOver() public view returns(  // return bool and other status params
             bool res,
             uint8 resType, 
             uint8[kingdomNum] indexSort, 
             uint[kingdomNum] balanceSort) {
 
+        // cost a lot of gas when finalize and deuce
         if (block.number > endBlockNum) {
             (resType, indexSort, balanceSort) = gameResult();
 
@@ -86,9 +104,8 @@ contract ThreeKingdoms {
         res = false;
         return;
     }
-
     /**
-    * game result
+    * get the status of the game, there are 4 type of status
     * 
     * uint8
     * 0 means a = b = c
@@ -127,7 +144,7 @@ contract ThreeKingdoms {
     }
 
     /**
-    * sort three kingdoms by balance, from high to low
+    * sort three kingdoms by balance, from high to low, a hack way
     */
     function sortThree() private view returns(uint8[kingdomNum], uint[kingdomNum]) {
         uint balance0 = data[0].balance;
@@ -158,7 +175,7 @@ contract ThreeKingdoms {
     }
 
     /**
-    * finalize the game
+    * finalize the game, only owner can call it
     * will call checkGameOver(), reward() and withdraw()
     */
     function finalize() external {
@@ -169,12 +186,12 @@ contract ThreeKingdoms {
         uint8[kingdomNum] memory indexSort,
         uint[kingdomNum] memory balanceSort) = checkGameOver();
 
-        require(res, "the game is not over");
+        require(res, "the game is not over");  // game should be over
 
-        // get reward value
+        // get value reward to voters
         uint rewardValue = getRewardValue();
 
-        // reward voters
+        // reward voters according to different end status
         if (resType == 2) {
             reward(indexSort[0], balanceSort[0], rewardValue);
         } else {
@@ -183,7 +200,7 @@ contract ThreeKingdoms {
             reward(indexSort[2], totalBalance, rewardValue);
         }
 
-        // developer withdraw
+        // withdraw left money to owner
         withdraw();
     }
 
@@ -198,17 +215,25 @@ contract ThreeKingdoms {
     /**
     * reward a kingdom or an address
     */
+    event Reward(
+        address indexed _to,
+        uint _value
+    );
     function reward(uint8 kingdomIndex, uint totalBalance, uint rewardValue) private {
         uint voterLength = data[kingdomIndex].voters.length;
         for (uint i = 0; i < voterLength; i++) {
             address voterAddress = data[kingdomIndex].voters[i];
             uint voterBlance = data[kingdomIndex].votes[voterAddress];
-            reward(voterAddress, voterBlance, totalBalance, rewardValue);
+            uint voterAmount = getRewardAmount(voterBlance, totalBalance, rewardValue);
+            reward(voterAddress, voterAmount);
         }
     }
-    function reward(address addr, uint balance, uint totalBalance, uint rewardValue) private {
-        uint amount = (rewardValue * balance) / totalBalance;
+    function reward(address addr, uint amount) private {
         addr.transfer(amount);
+        emit Reward(addr, amount);
+    }
+    function getRewardAmount(uint balance, uint totalBalance, uint rewardValue) public pure returns(uint) {
+        return (rewardValue * balance) / totalBalance;
     }
 
     /**

@@ -25,6 +25,11 @@ contract ThreeKingdomsTest {
     // percentage of value reward voters
     uint constant ratio = 8500;
 
+    modifier validKingdomIndex(uint8 kingdomIndex) {
+        require(kingdomIndex < kingdomNum, "invalid kingdomIndex");
+        _;
+    }
+
     /**
     * init owner, data and endBlockNum
     */
@@ -61,8 +66,8 @@ contract ThreeKingdomsTest {
         uint8 indexed _index,
         uint _value
     );
-    function vote(uint8 kingdomIndex) external payable returns(uint) {
-        require(kingdomIndex < kingdomNum, "wrong input kingdomIndex");
+    function vote(uint8 kingdomIndex) external payable validKingdomIndex(kingdomIndex) 
+            returns(uint) {
         require(msg.value >= minVoteValue, "vote value is lower than threshold");
         require(!isGameOver(), "game is over");
 
@@ -237,7 +242,8 @@ contract ThreeKingdomsTest {
         address indexed _to,
         uint _value
     );
-    function reward(uint8 kingdomIndex, uint totalBalance, uint rewardValue) private {
+    function reward(uint8 kingdomIndex, uint totalBalance, uint rewardValue) 
+            private validKingdomIndex(kingdomIndex) {
         uint voterLength = data[kingdomIndex].voters.length;
         for (uint i = 0; i < voterLength; i++) {
             address voterAddress = data[kingdomIndex].voters[i];
@@ -262,8 +268,8 @@ contract ThreeKingdomsTest {
         owner.transfer(amount);
     }
 
-    function getBalance(uint8 kingdomIndex) public view returns(uint) {
-        require(kingdomIndex < kingdomNum, "wrong input kingdomIndex");
+    function getBalance(uint8 kingdomIndex) public view validKingdomIndex(kingdomIndex) 
+            returns(uint) {
         return data[kingdomIndex].balance;
     }
 
@@ -271,13 +277,32 @@ contract ThreeKingdomsTest {
         return address(this).balance;
     }
 
-    function getVoters(uint8 kingdomIndex) public view returns(address[]){
-        require(kingdomIndex < kingdomNum, "wrong input kingdomIndex");
+    function getVoters(uint8 kingdomIndex) public view validKingdomIndex(kingdomIndex) 
+            returns(address[]) {
         return data[kingdomIndex].voters;
     }
 
-    function getVotes(uint8 kingdomIndex, address addr) public view returns(uint){
-        require(kingdomIndex < kingdomNum, "wrong input kingdomIndex");
+    function getVote(uint8 kingdomIndex, address addr) public view validKingdomIndex(kingdomIndex) 
+            returns(uint){
         return data[kingdomIndex].votes[addr];
+    }
+
+    function getVotes(uint8 kingdomIndex) public view validKingdomIndex(kingdomIndex) 
+            returns(uint[]) {
+        uint voterLength = data[kingdomIndex].voters.length;
+        uint[] memory votes = new uint[](voterLength);
+        
+        for (uint i = 0; i < voterLength; i++) {
+            address addr = data[kingdomIndex].voters[i];
+            uint balance = data[kingdomIndex].votes[addr];
+            votes[i] = balance;
+        }
+
+        return votes;
+    }
+
+    function getVotersAndVotes(uint8 kingdomIndex) public view validKingdomIndex(kingdomIndex) 
+            returns(address[], uint[]) {
+        return (getVoters(kingdomIndex), getVotes(kingdomIndex));
     }
 }

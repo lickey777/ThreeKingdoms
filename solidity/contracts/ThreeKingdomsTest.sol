@@ -166,6 +166,7 @@ contract ThreeKingdomsTest {
 
     /**
     * sort three kingdoms by balance, from high to low, a hack way
+    * TODO: make this part more elegent
     */
     function sortThree() private view returns(uint8[kingdomNum], uint[kingdomNum]) {
         uint balance0 = data[0].balance;
@@ -301,8 +302,59 @@ contract ThreeKingdomsTest {
         return votes;
     }
 
-    function getVotersAndVotes(uint8 kingdomIndex) public view validKingdomIndex(kingdomIndex) 
-            returns(address[], uint[]) {
-        return (getVoters(kingdomIndex), getVotes(kingdomIndex));
+    /**
+    * TODO: the logic of determine reward is also in finalize(), combine them
+    */
+    function getVotersVotesRewards(uint8 kingdomIndex) public view validKingdomIndex(kingdomIndex) 
+            returns(address[] voters, uint[] votes, uint[] rewards) {
+        voters = getVoters(kingdomIndex);
+        votes = getVotes(kingdomIndex);
+        uint length = voters.length;
+        rewards = new uint[](length);
+        
+        uint8 resType;
+        uint8[kingdomNum] memory indexSort;
+        uint[kingdomNum] memory balanceSort;
+        (resType, indexSort, balanceSort) = getGameResult();
+
+        // deuce, no reward
+        if (resType == 0 || resType == 1) {
+            return;
+        }
+
+        uint totalBalance;
+        uint reward;
+        uint rewardValue = getRewardValue();
+        if (resType == 2) {
+            // loser
+            if (kingdomIndex != indexSort[0]) {
+                return;
+            }
+
+            totalBalance = balanceSort[0];
+            for (uint i = 0; i < length; i++) {
+                reward = getRewardAmount(
+                    votes[i], 
+                    totalBalance, 
+                    rewardValue);
+                rewards[i] = reward;
+            }
+            return;
+        } else {
+            // loser
+            if (kingdomIndex == indexSort[0]) {
+                return;
+            }
+
+            totalBalance = balanceSort[1] + balanceSort[2];
+            for (uint j = 0; j < length; j++) {
+                reward = getRewardAmount(
+                    votes[j], 
+                    totalBalance, 
+                    rewardValue);
+                rewards[j] = reward;
+            }
+            return;
+        }
     }
 }

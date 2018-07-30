@@ -93,11 +93,14 @@ contract ThreeKingdomsTest {
     * and there is no deuce, the game is over.
     * only when res == true, other return params take effect
     */
-    function getBlockLeft() public view returns(uint){
-        return endBlockNum - block.number;
+    function getBlockLeft() public view returns(int) {
+        if (endBlockNum < block.number) {
+            return int(-(block.number - endBlockNum));
+        }
+        return int(endBlockNum - block.number);
     }
     function isGameOver() public view returns(bool res) {  // only return a bool
-        uint blockLeft;
+        int blockLeft;
         uint8 resType;
         uint8[kingdomNum] memory indexSort; 
         uint[kingdomNum] memory balanceSort;
@@ -106,7 +109,7 @@ contract ThreeKingdomsTest {
     }
     function checkGameOver() public view returns(  // return bool and other status params
             bool res,
-            uint blockLeft,
+            int blockLeft,
             uint8 resType, 
             uint8[kingdomNum] indexSort, 
             uint[kingdomNum] balanceSort) {
@@ -166,7 +169,6 @@ contract ThreeKingdomsTest {
 
     /**
     * sort three kingdoms by balance, from high to low, a hack way
-    * TODO: make this part more elegent
     */
     function sortThree() private view returns(uint8[kingdomNum], uint[kingdomNum]) {
         uint balance0 = data[0].balance;
@@ -204,7 +206,7 @@ contract ThreeKingdomsTest {
         require(owner == msg.sender, "only owner can finalize the game");
 
         bool res;
-        uint blockLeft;
+        int blockLeft;
         uint8 resType;
         uint8[kingdomNum] memory indexSort;
         uint[kingdomNum] memory balanceSort;
@@ -302,9 +304,6 @@ contract ThreeKingdomsTest {
         return votes;
     }
 
-    /**
-    * TODO: the logic of determine reward is also in finalize(), combine them
-    */
     function getVotersVotesRewards(uint8 kingdomIndex) public view validKingdomIndex(kingdomIndex) 
             returns(address[] voters, uint[] votes, uint[] rewards) {
         voters = getVoters(kingdomIndex);

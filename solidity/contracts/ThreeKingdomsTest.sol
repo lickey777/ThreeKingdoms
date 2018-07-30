@@ -16,7 +16,7 @@ contract ThreeKingdomsTest {
     // the block number end up with
     uint endBlockNum;
     // max block number since last deposit, approximate 144*200/3600=8 hours
-    uint constant maxBlockNum = 200;
+    uint constant maxBlockNum = 30;
     // min vote value, 0.1 QTUM
     uint constant qtumToken = 1e8;
     uint constant minVoteValue = qtumToken / 10;
@@ -56,7 +56,7 @@ contract ThreeKingdomsTest {
     function getVotePrice(uint currentSend) public view returns(uint) {
         uint value = address(this).balance - currentSend;  // sub the value send currently
         uint token = value / qtumToken;
-        return ratioDecimal / 100 + ratioDecimal * token / 1000;
+        return ratioDecimal / 100 + ratioDecimal * token / 10000;
     }
     /**
     * vote token for your kingdom
